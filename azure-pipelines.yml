@@ -1,22 +1,10 @@
-variables:
-    MAP_NPMTOKEN: $(NPMTOKEN) # Mapping secret var
-
 trigger:
-- none
+- main
 
 pool:
   vmImage: 'ubuntu-latest'
 
-steps: # Checking out connected repo
-- checkout: self
-  persistCredentials: true
-  clean: true
-    
-- task: npmAuthenticate@0
-  inputs:
-    workingFile: .npmrc
-    customEndpoint: 'my-npm-connection'
-    
+steps:
 - task: NodeTool@0
   inputs:
     versionSpec: '16.x'
@@ -27,45 +15,21 @@ steps: # Checking out connected repo
   displayName: 'npm install'
 
 - script: |
-    npm pack
-  displayName: 'Package for release'
-
-- bash: | # Grab the package version
-    v=`node -p "const p = require('./package.json'); p.version;"`
-    echo "##vso[task.setvariable variable=packageVersion]$v"
-
-- task: CopyFiles@2
-  inputs:
-      contents: '*.tgz'
-      targetFolder: $(Build.ArtifactStagingDirectory)/npm
-  displayName: 'Copy archives to artifacts staging directory'
+    npm run build
+  displayName: 'npm build'
 
 - task: CopyFiles@2
   inputs:
     sourceFolder: '$(Build.SourcesDirectory)'
-    contents: 'package.json' 
-    targetFolder: $(Build.ArtifactStagingDirectory)/npm
-  displayName: 'Copy package.json'
+    contents: |
+       src/*
+       public/*
+    targetFolder: '$(Build.ArtifactStagingDirectory)'
+  displayName: 'Copy project files'
 
-- task: PublishBuildArtifacts@1 
+- task: PublishPipelineArtifact@1
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)/npm'
-    artifactName: npm
+    artifactName: e2e-server
+    targetPath: '$(Build.ArtifactStagingDirectory)'
+    publishLocation: 'pipeline'
   displayName: 'Publish npm artifact'
-
-- script: |  # Config can be set in .npmrc
-    npm config set //registry.npmjs.org/:_authToken=$(MAP_NPMTOKEN) 
-    npm config set scope "@myscope"
-    # npm config list
-    # npm --version
-    npm version patch --force
-    npm publish --access public
-
-- task: CmdLine@2 # Push changes to GitHub (substitute your repo)
-  inputs:
-    script: |
-      git config --global user.email "username@contoso.com"
-      git config --global user.name "Azure Pipeline"
-      git add package.json
-      git commit -a -m "Test Commit from Azure DevOps"
-      git push -u origin HEAD:main
