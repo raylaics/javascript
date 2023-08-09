@@ -5,6 +5,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 steps:
+- bash: echo "Hello world"
 - task: NodeTool@0
   inputs:
     versionSpec: '16.x'
